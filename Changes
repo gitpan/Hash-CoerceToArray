@@ -1,0 +1,6 @@
+Revision history for Perl extension Hash::CoerceToArray.
+
+0.01  Sun Mar 24 10:23:43 2013
+	- original version; created by h2xs 1.23 with options
+		-AX Hash::CoerceToArray
+
