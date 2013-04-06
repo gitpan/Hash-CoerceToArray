@@ -5,15 +5,15 @@ use strict;
 
 use Exporter;
 our @ISA     = qw/Exporter/;
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Carp qw/croak/;
 
-our @EXPORT_OK = qw/coerceArray getMaxDepth/;
+our @EXPORT_OK = qw/coerceArray getMinMaxDepth/;
 
 our ($hashRefLocal,$depth);
 sub coerceArray {
-    my ($hashRef, $givenDepth) = @_;
+    my ($hashRef, $givenDepth, $sort) = @_;
 
     ## This would be changed in called functions
     ## hence 'local' declaration
@@ -21,20 +21,24 @@ sub coerceArray {
 
     ## die if not a HASH REFERENCE    
     if (ref($hashRefLocal) ne 'HASH') {
-        croak "Please provide a HashRef\n";
+        croak 'Please provide a HashRef';
+    }
+
+    if($sort && $sort !~ /^(keys|values)$/) {
+        croak 'Please provide sort option as keys|values';
     }
 
     ## Use the maximum depth if not given one
     ## This depth should be accessible to all local functions
     ## hence 'local' declaration       
-    local $depth = getMaxDepth($hashRefLocal) if (!$givenDepth);
+    local $depth = getMinMaxDepth($hashRefLocal) if (!$givenDepth);
     $depth = $givenDepth if($givenDepth);
 
     ## Recursive iteration to go where HASH REFERENCE
     ## to ARRAY REFERENCE coercion is sought
     my $counter = 1;
     foreach my $rec (keys %$hashRefLocal) {
-        _goDeepAndCoerce($$hashRefLocal{$rec},$counter,$rec);
+        _goDeepAndCoerce($$hashRefLocal{$rec},$counter,$rec,$sort);
     }
 
     return $hashRefLocal;
@@ -42,7 +46,7 @@ sub coerceArray {
 }
 
 sub _goDeepAndCoerce {
-    my ($hashRef,$counter,$key) = @_;
+    my ($hashRef,$counter,$key,$sort) = @_;
 
     if ($depth == ($counter+1)) {
 
@@ -60,8 +64,22 @@ sub _goDeepAndCoerce {
             $arrayRef = $hashRef;
         }
         else {
-            while(my ($keyLocal, $valueLocal) = each %$hashRef) {
-                push @$arrayRef, $keyLocal, $valueLocal;
+            if ($sort) {
+                if ($sort eq 'keys') {
+                    foreach my $keyLocal (sort {$a cmp $b} keys %$hashRef) {
+                        push @$arrayRef, $keyLocal, $$hashRef{$keyLocal};
+                    }
+                }
+                else {
+                    foreach my $keyLocal (sort {$$hashRef{$a} cmp $$hashRef{b}} keys %$hashRef) {
+                        push @$arrayRef, $keyLocal, $$hashRef{$keyLocal};
+                    }
+                }
+            }
+            else {
+                while (my ($keyLocal, $valueLocal) = each %$hashRef) {
+                    push @$arrayRef, $keyLocal, $valueLocal;
+                }
             }
         }
 
@@ -74,32 +92,44 @@ sub _goDeepAndCoerce {
 
     $counter++; 
     foreach my $rec (keys %$hashRef) {
-        _goDeepAndCoerce($$hashRef{$rec},$counter,"$key:$rec");
+        _goDeepAndCoerce($$hashRef{$rec},$counter,"$key:$rec",$sort);
     }
 }
 
-sub getMaxDepth {
-    my ($hashRef) = @_;
+sub getMinMaxDepth {
+    my ($hashRef,$minMax) = @_;
+
+    $minMax = 'max' if(!$minMax);
+
+    if ($minMax !~ /^(min|max)$/) {
+        croak 'Please provide option for depth - min|max';
+    }
 
     ## Used to keep track which key at certain level
     ## has value with maximum depth
-    my $max_depth_this_level;
+    my $maxDepthThisLevel;
 
     foreach my $rec (keys %$hashRef) {
-        ## Increment and recursively call getMaxDepth
+        ## Increment and recursively call getMinMaxDepth
         ## If value is a hash refearence
         if (ref($$hashRef{$rec}) eq 'HASH') {
-            $$max_depth_this_level{$rec} = 1+getMaxDepth($$hashRef{$rec})
+            $$maxDepthThisLevel{$rec} = 1+getMinMaxDepth($$hashRef{$rec});
         }
         else {
-            $$max_depth_this_level{$rec} = 1;
+            $$maxDepthThisLevel{$rec} = 1;
         }
     }
     
-    ## Return the maximum depth as obtained in one level
-    my $max_depth = (sort {$b<=>$a} values %$max_depth_this_level)[0];
+    ## Return the maximum or minimum depth as obtained in certain level
+    my $depth;
+    if ($minMax eq 'max') {
+        $depth = (sort {$b<=>$a} values %$maxDepthThisLevel)[0];
+    }
+    elsif ($minMax eq 'min') {
+        $depth = (sort {$a<=>$b} values %$maxDepthThisLevel)[0];
+    }
 
-    return $max_depth;
+    return $depth;
 }
 
 1;
@@ -112,19 +142,22 @@ Hash::CoerceToArray - Find the depth of any multi-hierarchical HASH REFERENCE st
                        
 =head1 SYNOPSIS
 
-  use Hash::CoerceToArray qw /coerceArray getMaxDepth/;
+  use Hash::CoerceToArray qw /coerceArray getMinMaxDepth/;
   
-  my $maxDepth = getMaxDepth (\%hash);
+  my $maxDepth = getMinMaxDepth (\%hash);
+  my $minDepth = getMinMaxDepth (\%hash, 'min');
 
   my $hashRef = coerceArray(\%hash);
   my $hashRef = coerceArray(\%hash, $maxDepth);
 
+  my $hashRef = coerceArray(\%hash, $maxDepth, 'keys')   --> sorts at $maxDepth based on keys
+  my $hashRef = coerceArray(\%hash, $maxDepth, 'values') --> sorts at $maxDepth based on values
   
   map {$hashRef = coerceArray($hashRef,$_);} (1..$maxDepth)
   
 =head1 ABSTRACT
 
-  This module allow the user the user to get maximum depth of a HASH REFERENCE
+  This module allows the user to get maximum or minimum depth of a HASH REFERENCE
   variable in a multilevel structure where values are HASH REFERENCES themselves.
 
   Also, user is allowed to change the HASH REFERENCE value at any level randomly
@@ -146,9 +179,13 @@ Hash::CoerceToArray - Find the depth of any multi-hierarchical HASH REFERENCE st
                                                },
                                     },
                          },
+                   'L1_2' => 'V1',
               };
-  print getMaxDepth($hashRef)
+  print getMinMaxDepth($hashRef)
   >>>> 4
+
+  print getMinMaxDepth($hashRef, 'min')
+  >>>> 1
 
   $hashRef = coerceArray($hashRef);
   print Dumper $hashRef; 

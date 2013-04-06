@@ -23,8 +23,8 @@ To install this module type the following:
 
 DEPENDENCIES
 
-This module requires standard perl libraries 
-
+This module requires standard perl libraries
+    
 NAME
     Hash::CoerceToArray - Find the depth of any multi-hierarchical HASH
     REFERENCE structure - Go to any level of the HASH REFERENCE randomly and
@@ -32,18 +32,21 @@ NAME
     REFERENCE
 
 SYNOPSIS
-      use Hash::CoerceToArray qw /coerceArray getMaxDepth/;
+      use Hash::CoerceToArray qw /coerceArray getMinMaxDepth/;
   
-      my $maxDepth = getMaxDepth (\%hash);
+      my $maxDepth = getMinMaxDepth (\%hash);
+      my $minDepth = getMinMaxDepth (\%hash, 'min');
 
       my $hashRef = coerceArray(\%hash);
       my $hashRef = coerceArray(\%hash, $maxDepth);
 
+      my $hashRef = coerceArray(\%hash, $maxDepth, 'keys')   --> sorts at $maxDepth based on keys
+      my $hashRef = coerceArray(\%hash, $maxDepth, 'values') --> sorts at $maxDepth based on values
   
       map {$hashRef = coerceArray($hashRef,$_);} (1..$maxDepth)
 
 ABSTRACT
-      This module allow the user the user to get maximum depth of a HASH REFERENCE
+      This module allows the user to get maximum or minimum depth of a HASH REFERENCE
       variable in a multilevel structure where values are HASH REFERENCES themselves.
 
       Also, user is allowed to change the HASH REFERENCE value at any level randomly
@@ -64,9 +67,13 @@ DESCRIPTION
                                                    },
                                         },
                              },
+                       'L1_2' => 'V1',
                   };
-      print getMaxDepth($hashRef)
+      print getMinMaxDepth($hashRef)
       >>>> 4
+
+      print getMinMaxDepth($hashRef, 'min')
+      >>>> 1
 
       $hashRef = coerceArray($hashRef);
       print Dumper $hashRef; 
@@ -150,5 +157,8 @@ COPYRIGHT & LICENSE
 
     This program is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.
+
+
+
 
 
